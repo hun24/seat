@@ -13,7 +13,7 @@
         
         .main-container { display: flex; gap: 20px; max-width: 1200px; margin: 0 auto; align-items: flex-start; }
         
-        /* 왼쪽 패널 (컨트롤 및 명렬표) */
+        /* 왼쪽 패널 */
         .sidebar { width: 320px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 15px; flex-shrink: 0; }
         .config-group { border-bottom: 1px solid #eee; padding-bottom: 15px; display: flex; flex-direction: column; gap: 8px; }
         .config-group:last-child { border: none; padding-bottom: 0; }
@@ -26,11 +26,11 @@
         .student-info { display: flex; gap: 10px; align-items: center; }
         .special-toggle { font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
         
-        /* 오른쪽 패널 (교실 화면) */
+        /* 오른쪽 교실 화면 */
         .content { flex-grow: 1; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-height: 600px; }
         
         .classroom-grid { display: grid; gap: 10px; justify-content: center; padding: 20px; }
-        .seat { width: 90px; height: 65px; border: 2px solid #ddd; display: flex; flex-direction: column; align-items: center; 
+        .seat { height: 65px; border: 2px solid #ddd; display: flex; flex-direction: column; align-items: center; 
                 justify-content: center; text-align: center; font-weight: bold; cursor: pointer; border-radius: 8px; font-size: 12px; transition: 0.2s; background: #fff; }
         .seat:hover { transform: translateY(-2px); border-color: var(--primary); }
         .seat.excluded { background-color: #eee; color: #bbb; border-style: dashed; }
@@ -45,11 +45,12 @@
         .row-col-inputs { display: flex; gap: 10px; align-items: center; }
         input[type="number"] { padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 60px; }
         #status-text { font-size: 12px; color: var(--primary); font-weight: bold; text-align: center; }
+        .checkbox-label { font-weight: normal !important; font-size: 12px !important; cursor: pointer; display: flex; align-items: center; gap: 5px; margin-top: 5px; }
     </style>
 </head>
 <body>
     <div class="header">
-        <h2>🏫 스마트 자리 배치기 Web v1.4</h2>
+        <h2>🏫 스마트 자리 배치기 Web v1.5</h2>
     </div>
 
     <div class="main-container">
@@ -75,7 +76,10 @@
                     행: <input type="number" id="rows" value="5" min="1">
                     열: <input type="number" id="cols" value="6" min="1">
                 </div>
-                <button id="create-grid-btn" style="background: #95a5a6;">교실 틀 생성</button>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="pair-mode"> 2인 1조 분단 띄어앉기 (복도 추가)
+                </label>
+                <button id="create-grid-btn" style="background: #95a5a6; margin-top: 5px;">교실 틀 생성</button>
             </div>
 
             <div class="config-group">
@@ -96,7 +100,7 @@
         </div>
     </div>
 
-    <!-- 파이썬 환경 설정: 구글 폰트 원본 저장소에서 확실한 TTF 파일 다운로드 -->
+    <!-- 파이썬 환경 설정 -->
     <py-config>
         packages = ["fpdf2", "openpyxl"]
         
@@ -118,7 +122,6 @@
         result_grid = None
         selected_for_swap = None
 
-        # --- UI 업데이트 ---
         def update_roster_ui():
             roster_div = document.querySelector("#roster")
             roster_div.innerHTML = ""
@@ -152,15 +155,12 @@
                     return handler
                     
                 cb.onchange = make_toggle(i, label)
-                
                 label.appendChild(cb)
                 label.appendChild(js_document.createTextNode(" 특별"))
-                
                 item.appendChild(info)
                 item.appendChild(label)
                 roster_div.appendChild(item)
 
-        # --- 1. 파일 로드 ---
         @when("click", "#load-btn")
         def trigger_upload(event):
             document.querySelector("#file-upload").click()
@@ -199,18 +199,26 @@
             except Exception as e:
                 window.alert(f"명단 읽기 오류: {str(e)}")
 
-        # --- 2. 교실 틀 생성 ---
         @when("click", "#create-grid-btn")
         def create_grid(event):
             global seat_states, result_grid, selected_for_swap
             try:
                 rows = int(document.querySelector("#rows").value)
                 cols = int(document.querySelector("#cols").value)
+                pair_mode = document.querySelector("#pair-mode").checked
             except: return
             
             container = document.querySelector("#classroom")
             container.innerHTML = ""
-            container.style.gridTemplateColumns = f"repeat({cols}, 100px)"
+            
+            # CSS Grid Columns 생성 (짝꿍 모드일 때 빈 공간 추가)
+            gtc = []
+            for c in range(cols):
+                gtc.append("90px")
+                if pair_mode and c % 2 == 1 and c != cols - 1:
+                    gtc.append("20px") # 분단 사이 빈 공간
+            
+            container.style.gridTemplateColumns = " ".join(gtc)
             
             desk = js_document.createElement("div")
             desk.className = "desk"
@@ -234,6 +242,11 @@
                     
                     div.onclick = make_handler(r, c)
                     container.appendChild(div)
+                    
+                    # 짝꿍 모드이면서 짝수 번째 열이고 마지막 열이 아닐 때 빈 div(복도) 추가
+                    if pair_mode and c % 2 == 1 and c != cols - 1:
+                        gap_div = js_document.createElement("div")
+                        container.appendChild(gap_div)
 
         def toggle_seat(r, c):
             global result_grid, selected_for_swap
@@ -274,7 +287,6 @@
             el.className = f"seat {new_state}"
             el.innerText = "X" if new_state == "excluded" else "★특별" if new_state == "special" else "빈 자리"
 
-        # --- 3. 배치 실행 ---
         @when("click", "#arrange-btn")
         def arrange_seats(event):
             global result_grid, selected_for_swap
@@ -291,8 +303,7 @@
             cols = int(document.querySelector("#cols").value)
             result_grid = [[None for _ in range(cols)] for _ in range(rows)]
             
-            special_seats = []
-            normal_seats = []
+            special_seats, normal_seats = [], []
             for r in range(rows):
                 for c in range(cols):
                     state = seat_states.get((r,c))
@@ -328,7 +339,6 @@
                 else:
                     document.querySelector(f"#seat-{r}-{c}").innerText = ""
 
-        # --- 4. PDF 저장 ---
         @when("click", "#pdf-btn")
         def save_pdf(event):
             if not result_grid:
@@ -336,31 +346,55 @@
                 return
             
             try:
+                rows = len(result_grid)
+                cols = len(result_grid[0])
+                pair_mode = document.querySelector("#pair-mode").checked
+                
+                # 띄어앉기(복도) 폭 계산
+                num_gaps = (cols // 2) - 1 if cols % 2 == 0 else (cols // 2)
+                if num_gaps < 0: num_gaps = 0
+                gap_width = 15 # 분단 사이 폭 (mm)
+                
+                available_width = 270 
+                if pair_mode:
+                    cell_width = (available_width - (num_gaps * gap_width)) / cols
+                else:
+                    cell_width = available_width / cols
+
                 pdf = FPDF(orientation='L', unit='mm', format='A4')
                 pdf.add_page()
-                
-                # 업데이트된 폰트 파일명 사용
                 pdf.add_font("NanumGothic", "", "NanumGothic-Regular.ttf")
                 pdf.set_font("NanumGothic", size=20)
                 
                 pdf.cell(0, 15, "학급 자리 배치도", ln=True, align='C')
                 pdf.ln(10)
-                
-                rows = len(result_grid)
-                cols = len(result_grid[0])
-                available_width = 270 
-                cell_width = available_width / cols
-                
                 pdf.set_font("NanumGothic", size=14)
                 
-                for row in result_grid:
-                    pdf.set_x(15)
-                    for s in row:
-                        txt = f"{s['num']}\n{s['name']}" if s else ""
+                for r_idx, row in enumerate(result_grid):
+                    pdf.set_x(15) # 좌측 여백 설정
+                    
+                    for c_idx, s in enumerate(row):
+                        state = seat_states.get((r_idx, c_idx))
+                        
+                        # 내용이 있든 없든 반드시 2줄 높이(' \n ')를 유지하도록 처리 (칸 크기 통일)
+                        if s:
+                            txt = f"{s['num']}\n{s['name']}"
+                        elif state == "excluded":
+                            txt = "X\n " 
+                        else:
+                            txt = " \n "
+                        
                         x, y = pdf.get_x(), pdf.get_y()
                         pdf.multi_cell(cell_width, 10, txt, border=1, align='C')
-                        pdf.set_xy(x + cell_width, y)
-                    pdf.ln(20)
+                        
+                        # 짝꿍 모드일 때 X축 좌표 이동 (복도 추가)
+                        next_x = x + cell_width
+                        if pair_mode and c_idx % 2 == 1 and c_idx != cols - 1:
+                            next_x += gap_width
+                            
+                        pdf.set_xy(next_x, y)
+                    
+                    pdf.ln(20) # 다음 행으로 이동
 
                 pdf_bytes = bytearray(pdf.output())
                 js_array = Uint8Array.new(len(pdf_bytes))

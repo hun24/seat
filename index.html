@@ -3,48 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>스마트 자리 배치기 Web v1.0</title>
+    <title>스마트 자리 배치기 Web</title>
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <style>
-        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f4f7f6; padding: 20px; }
-        .control-panel { background: white; padding: 20px; border-radius: 10px; display: flex; gap: 20px; flex-wrap: wrap; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .classroom-grid { margin-top: 30px; display: grid; gap: 10px; justify-content: center; }
-        .seat { width: 100px; height: 60px; border: 1px solid #ccc; display: flex; align-items: center; 
-                justify-content: center; text-align: center; font-weight: bold; cursor: pointer; border-radius: 5px; font-size: 12px; }
-        .seat.excluded { background-color: #d1d1d1; }
-        .seat.special { background-color: #e3f2fd; }
-        .seat.fixed { background-color: #fff3cd; }
-        .seat.selected { border: 2px solid red; }
-        .desk { grid-column: 1 / -1; background: #495057; color: white; padding: 10px; text-align: center; margin: 20px 0; border-radius: 5px; }
-        button { padding: 8px 15px; cursor: pointer; border: none; border-radius: 4px; background: #007bff; color: white; }
-        button:hover { background: #0056b3; }
-        .config-group { border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
+        :root { --primary: #007bff; --success: #28a745; --bg: #f4f7f6; }
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: var(--bg); padding: 20px; color: #333; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .control-panel { background: white; padding: 20px; border-radius: 12px; display: flex; gap: 15px; flex-wrap: wrap; box-shadow: 0 4px 6px rgba(0,0,0,0.05); align-items: flex-end; }
+        .config-group { border-right: 1px solid #eee; padding-right: 15px; display: flex; flex-direction: column; gap: 5px; }
+        .config-group:last-child { border: none; }
+        .config-group label { font-size: 12px; font-weight: bold; color: #666; }
+        
+        .classroom-grid { margin-top: 30px; display: grid; gap: 10px; justify-content: center; padding: 20px; background: #fff; border-radius: 15px; }
+        .seat { width: 90px; height: 60px; border: 1px solid #ddd; display: flex; flex-direction: column; align-items: center; 
+                justify-content: center; text-align: center; font-weight: bold; cursor: pointer; border-radius: 8px; font-size: 11px; transition: 0.2s; background: #fff; }
+        .seat:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .seat.excluded { background-color: #eee; color: #bbb; border-style: dashed; }
+        .seat.special { background-color: #e3f2fd; border-color: #2196f3; color: #1976d2; }
+        .desk { grid-column: 1 / -1; background: #343a40; color: white; padding: 12px; text-align: center; margin-bottom: 20px; border-radius: 8px; font-weight: bold; }
+        
+        button { padding: 10px 18px; cursor: pointer; border: none; border-radius: 6px; background: var(--primary); color: white; font-weight: bold; }
+        button:hover { opacity: 0.9; }
+        .btn-success { background: var(--success); }
+        .btn-info { background: #17a2b8; }
+        input[type="number"] { padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 50px; }
+        #status { font-size: 13px; color: var(--primary); margin-top: 5px; }
     </style>
 </head>
 <body>
-    <h2>🏫 스마트 자리 배치기 Web</h2>
+    <div class="header">
+        <h2>🏫 스마트 자리 배치기 Web v1.3</h2>
+    </div>
 
     <div class="control-panel">
         <div class="config-group">
-            <strong>1. 명단 관리</strong><br>
+            <label>1. 명단 로드</label>
             <input type="file" id="file-upload" accept=".txt,.xlsx" style="display:none">
-            <button onclick="document.getElementById('file-upload').click()">명단 불러오기</button>
+            <button id="load-btn">파일 선택</button>
             <div id="status">학생: 0명</div>
         </div>
 
         <div class="config-group">
-            <strong>2. 배치 설정</strong><br>
-            행: <input type="number" id="rows" value="5" style="width:40px">
-            열: <input type="number" id="cols" value="6" style="width:40px">
-            <label><input type="checkbox" id="pair-mode"> 2인 1조</label>
+            <label>2. 격자 설정</label>
+            <div>
+                행 <input type="number" id="rows" value="5" min="1">
+                열 <input type="number" id="cols" value="6" min="1">
+            </div>
         </div>
 
         <div class="config-group">
-            <strong>3. 실행</strong><br>
-            <button py-click="create_grid">교실 틀 생성</button>
-            <button py-click="arrange_seats" style="background:#28a745">랜덤 배치!!</button>
-            <button py-click="save_pdf" style="background:#17a2b8">PDF 저장</button>
+            <label>3. 화면 구성</label>
+            <button id="create-grid-btn">교실 틀 생성</button>
+        </div>
+
+        <div class="config-group">
+            <label>4. 배치 실행</label>
+            <button id="arrange-btn" class="btn-success">랜덤 배치 시작</button>
+        </div>
+
+        <div class="config-group">
+            <label>5. 결과 저장</label>
+            <button id="pdf-btn" class="btn-info">PDF 다운로드</button>
         </div>
     </div>
 
@@ -56,58 +76,63 @@
 
     <script type="py">
         import random
-        from pyscript import document, window
-        from fpdf import FPDF
         import io
         import openpyxl
+        from fpdf import FPDF
+        from pyscript import document, window, when
         from js import Uint8Array, Blob, URL, document as js_document
 
-        # --- 전역 상태 관리 ---
         students = []
-        seat_states = {} # (r, c) -> state
-        fixed_seats = {} # (r, c) -> student_obj
+        seat_states = {} 
         result_grid = None
-        selected_for_swap = None
 
-        # --- 파일 업로드 처리 ---
+        # 1. 파일 로드 버튼 연결
+        @when("click", "#load-btn")
+        def trigger_upload(event):
+            document.querySelector("#file-upload").click()
+
+        @when("change", "#file-upload")
         async def handle_file(event):
             global students
             file_list = event.target.files
-            if not file_list: return
-            file = file_list.item(0)
+            if not file_list or file_list.length == 0: return
             
+            file = file_list.item(0)
             array_buffer = await file.arrayBuffer()
             content = array_buffer.to_bytes()
             
             students = []
-            if file.name.endswith('.xlsx'):
-                f = io.BytesIO(content)
-                wb = openpyxl.load_workbook(f)
-                ws = wb.active
-                for row in ws.iter_rows(min_row=2, values_only=True):
-                    if row[0]: students.append({'num': str(row[0]), 'name': str(row[1]) if row[1] else "", 'special': False})
-            else:
-                text = content.decode('utf-8')
-                for line in text.splitlines():
-                    if line.strip():
-                        p = line.split(maxsplit=1)
-                        students.append({'num': p[0], 'name': p[1] if len(p)==2 else p[0], 'special': False})
-            
-            document.querySelector("#status").innerText = f"학생: {len(students)}명"
+            try:
+                if file.name.endswith('.xlsx'):
+                    f = io.BytesIO(content)
+                    wb = openpyxl.load_workbook(f)
+                    ws = wb.active
+                    for row in ws.iter_rows(min_row=2, values_only=True):
+                        if row[0]: students.append({'num': str(row[0]), 'name': str(row[1]) if row[1] else ""})
+                else:
+                    text = content.decode('utf-8')
+                    for line in text.splitlines():
+                        if line.strip():
+                            parts = line.split(maxsplit=1)
+                            students.append({'num': parts[0], 'name': parts[1] if len(parts)==2 else parts[0]})
+                
+                document.querySelector("#status").innerText = f"학생: {len(students)}명 로드됨"
+            except Exception as e:
+                window.alert(f"오류: {str(e)}")
 
-        document.getElementById("file-upload").addEventListener("change", window.create_proxy(handle_file))
-
-        # --- 교실 그리드 생성 ---
+        # 2. 교실 틀 생성
+        @when("click", "#create-grid-btn")
         def create_grid(event):
-            global seat_states, fixed_seats, result_grid
-            rows = int(document.querySelector("#rows").value)
-            cols = int(document.querySelector("#cols").value)
+            global seat_states, result_grid
+            try:
+                rows = int(document.querySelector("#rows").value)
+                cols = int(document.querySelector("#cols").value)
+            except: return
             
             container = document.querySelector("#classroom")
             container.innerHTML = ""
             container.style.gridTemplateColumns = f"repeat({cols}, 100px)"
             
-            # 교탁 추가
             desk = js_document.createElement("div")
             desk.className = "desk"
             desk.innerText = "[ 교 탁 ]"
@@ -123,28 +148,29 @@
                     div.className = "seat"
                     div.id = f"seat-{r}-{c}"
                     div.innerText = "빈 자리"
-                    # 클릭 이벤트 연결 (PyScript 함수 호출)
-                    div.onclick = lambda e, row=r, col=c: on_seat_click(row, col)
+                    
+                    # 클로저 이슈 방지를 위해 r, c 고정
+                    def make_handler(row, col):
+                        return lambda e: toggle_seat(row, col)
+                    
+                    div.onclick = make_handler(r, c)
                     container.appendChild(div)
 
-        def on_seat_click(r, c):
-            global selected_for_swap
-            state = seat_states.get((r,c), "normal")
+        def toggle_seat(r, c):
+            if result_grid: return
+            curr = seat_states.get((r,c), "normal")
+            new_state = "excluded" if curr == "normal" else "special" if curr == "excluded" else "normal"
+            seat_states[(r,c)] = new_state
             
-            # 배치 전 상태 변경
-            if result_grid is None:
-                new_state = "excluded" if state == "normal" else "special" if state == "excluded" else "normal"
-                seat_states[(r,c)] = new_state
-                el = document.querySelector(f"#seat-{r}-{c}")
-                el.className = f"seat {new_state}"
-            else:
-                # 배치 후 자리 바꾸기 로직 (간략화)
-                window.alert(f"{r}행 {c}열 선택됨 (자리 바꾸기 기능은 구현 필요)")
+            el = document.querySelector(f"#seat-{r}-{c}")
+            el.className = f"seat {new_state}"
+            el.innerText = "X" if new_state == "excluded" else "★특별" if new_state == "special" else "빈 자리"
 
-        # --- 배치 로직 (제공해주신 코드의 핵심 로직 이식) ---
+        # 3. 배치 실행
+        @when("click", "#arrange-btn")
         def arrange_seats(event):
             global result_grid
-            if not students: 
+            if not students:
                 window.alert("명단을 먼저 불러오세요!")
                 return
             
@@ -154,38 +180,38 @@
             
             pool = list(students)
             random.shuffle(pool)
-
+            
             for r in range(rows):
                 for c in range(cols):
-                    if seat_states.get((r,c)) == "excluded":
-                        document.querySelector(f"#seat-{r}-{c}").innerText = "X"
-                        continue
+                    state = seat_states.get((r,c))
+                    if state == "excluded": continue
                     
                     if pool:
                         s = pool.pop()
                         result_grid[r][c] = s
                         document.querySelector(f"#seat-{r}-{c}").innerText = f"{s['num']}\n{s['name']}"
 
-        # --- PDF 저장 (바이너리 다운로드 방식) ---
+        # 4. PDF 저장
+        @when("click", "#pdf-btn")
         def save_pdf(event):
-            if result_grid is None: return
+            if not result_grid:
+                window.alert("배치를 먼저 완료해주세요.")
+                return
             
             pdf = FPDF(orientation='L', unit='mm', format='A4')
             pdf.add_page()
-            # 웹에서는 폰트 경로 주의 (기본 폰트 사용 또는 URL 폰트 필요)
-            pdf.set_font("Arial", size=14) 
-            pdf.cell(0, 10, "Seat Arrangement", ln=True, align='C')
+            pdf.set_font("Arial", size=14)
+            pdf.cell(0, 10, "Classroom Seat Plan", ln=True, align='C')
+            pdf.ln(10)
             
-            # 간단한 PDF 테이블 생성
-            for r_idx, row in enumerate(result_grid):
+            for row in result_grid:
                 for s in row:
                     txt = f"{s['num']} {s['name']}" if s else "X"
-                    pdf.cell(40, 20, txt, border=1)
+                    pdf.cell(40, 20, txt, border=1, align='C')
                 pdf.ln()
 
             pdf_bytes = pdf.output()
             
-            # 자바스크립트를 통한 다운로드 실행
             js_array = Uint8Array.new(len(pdf_bytes))
             for i, b in enumerate(pdf_bytes): js_array[i] = b
             blob = Blob.new([js_array], {type: "application/pdf"})
@@ -194,6 +220,7 @@
             link.href = url
             link.download = "seats.pdf"
             link.click()
+            URL.revokeObjectURL(url)
     </script>
 </body>
 </html>

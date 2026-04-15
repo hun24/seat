@@ -33,6 +33,7 @@
         .seat:hover { transform: translateY(-2px); border-color: var(--primary); }
         .seat.excluded { background-color: #eee; color: #bbb; border-style: dashed; }
         .seat.special { background-color: #e3f2fd; border-color: #2196f3; color: #1976d2; }
+        .seat.selected { border: 3px solid #e74c3c; background-color: #ffebee; transform: scale(1.05); z-index: 1; box-shadow: 0 4px 8px rgba(231,76,60,0.2); }
         .desk { grid-column: 1 / -1; background: var(--dark); color: white; padding: 12px; text-align: center; margin-bottom: 20px; border-radius: 8px; font-weight: bold; }
         
         button { padding: 10px 15px; cursor: pointer; border: none; border-radius: 6px; background: var(--primary); color: white; font-weight: bold; transition: 0.2s; width: 100%; }
@@ -80,6 +81,7 @@
                 <label>3. 배치 및 저장</label>
                 <button id="arrange-btn" class="btn-success" style="margin-bottom: 5px;">랜덤 배치 시작</button>
                 <button id="pdf-btn" class="btn-info">PDF 다운로드</button>
+                <div style="font-size: 11px; color: #888; margin-top: 5px; text-align: center;">💡 배치 후 자리를 클릭해 서로 변경 가능</div>
             </div>
         </div>
 
@@ -113,6 +115,7 @@
         students = []
         seat_states = {} 
         result_grid = None
+        selected_for_swap = None
 
         # --- UI 업데이트 함수 ---
         def update_roster_ui():
@@ -151,13 +154,16 @@
                     wb = openpyxl.load_workbook(f)
                     ws = wb.active
                     for row in ws.iter_rows(min_row=2, values_only=True):
-                        if row[0]: students.append({'num': str(row[0]), 'name': str(row[1]) if row[1] else ""})
+                        if row[0]: 
+                            num_str = str(row[0]).replace('.0', '')
+                            students.append({'num': num_str, 'name': str(row[1]) if row[1] else ""})
                 else:
                     text = content.decode('utf-8')
                     for line in text.splitlines():
                         if line.strip():
                             parts = line.split(maxsplit=1)
-                            students.append({'num': parts[0], 'name': parts[1] if len(parts)==2 else parts[0]})
+                            num_str = parts[0].replace('.0', '')
+                            students.append({'num': num_str, 'name': parts[1] if len(parts)==2 else parts[0]})
                 
                 document.querySelector("#status-text").innerText = f"현재 인원: {len(students)}명"
                 update_roster_ui() # 명렬표 업데이트
@@ -185,6 +191,8 @@
 
             seat_states = {}
             result_grid = None
+            global selected_for_swap
+            selected_for_swap = None
             
             for r in range(rows):
                 for c in range(cols):
@@ -201,22 +209,59 @@
                     container.appendChild(div)
 
         def toggle_seat(r, c):
-            if result_grid: return
+            global result_grid, selected_for_swap
+            el = document.querySelector(f"#seat-{r}-{c}")
+            
+            if result_grid: 
+                # 자리 바꾸기 로직
+                if selected_for_swap is None:
+                    selected_for_swap = (r, c)
+                    el.classList.add("selected")
+                elif selected_for_swap == (r, c):
+                    selected_for_swap = None
+                    el.classList.remove("selected")
+                else:
+                    r1, c1 = selected_for_swap
+                    r2, c2 = r, c
+                    
+                    # 그리드 데이터 교환
+                    result_grid[r1][c1], result_grid[r2][c2] = result_grid[r2][c2], result_grid[r1][c1]
+                    
+                    # 화면 업데이트
+                    def get_text(row, col, s):
+                        if s: return f"{s['num']}\n{s['name']}"
+                        if seat_states.get((row, col)) == "excluded": return "X"
+                        return ""
+                    
+                    el1 = document.querySelector(f"#seat-{r1}-{c1}")
+                    el2 = document.querySelector(f"#seat-{r2}-{c2}")
+                    
+                    el1.innerText = get_text(r1, c1, result_grid[r1][c1])
+                    el2.innerText = get_text(r2, c2, result_grid[r2][c2])
+                    
+                    el1.classList.remove("selected")
+                    selected_for_swap = None
+                return
+            
             curr = seat_states.get((r,c), "normal")
             new_state = "excluded" if curr == "normal" else "special" if curr == "excluded" else "normal"
             seat_states[(r,c)] = new_state
             
-            el = document.querySelector(f"#seat-{r}-{c}")
             el.className = f"seat {new_state}"
             el.innerText = "X" if new_state == "excluded" else "★특별" if new_state == "special" else "빈 자리"
 
         # --- 3. 배치 실행 ---
         @when("click", "#arrange-btn")
         def arrange_seats(event):
-            global result_grid
+            global result_grid, selected_for_swap
             if not students:
                 window.alert("명단을 먼저 불러오세요!")
                 return
+                
+            if selected_for_swap:
+                prev_el = document.querySelector(f"#seat-{selected_for_swap[0]}-{selected_for_swap[1]}")
+                if prev_el: prev_el.classList.remove("selected")
+                selected_for_swap = None
             
             rows = int(document.querySelector("#rows").value)
             cols = int(document.querySelector("#cols").value)

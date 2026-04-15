@@ -50,7 +50,7 @@
 </head>
 <body>
     <div class="header">
-        <h2>🏫 스마트 자리 배치기 Web v1.5</h2>
+        <h2>🏫 스마트 자리 배치기 Web v1.6</h2>
     </div>
 
     <div class="main-container">
@@ -100,13 +100,13 @@
         </div>
     </div>
 
-    <!-- 파이썬 환경 설정 -->
+    <!-- 파이썬 환경 설정: 일반/볼드 폰트 두 개 모두 다운로드 -->
     <py-config>
         packages = ["fpdf2", "openpyxl"]
         
         [[fetch]]
         from = "https://raw.githubusercontent.com/google/fonts/main/ofl/nanumgothic/"
-        files = ["NanumGothic-Regular.ttf"]
+        files = ["NanumGothic-Regular.ttf", "NanumGothic-Bold.ttf"]
     </py-config>
 
     <script type="py">
@@ -211,12 +211,11 @@
             container = document.querySelector("#classroom")
             container.innerHTML = ""
             
-            # CSS Grid Columns 생성 (짝꿍 모드일 때 빈 공간 추가)
             gtc = []
             for c in range(cols):
                 gtc.append("90px")
                 if pair_mode and c % 2 == 1 and c != cols - 1:
-                    gtc.append("20px") # 분단 사이 빈 공간
+                    gtc.append("20px")
             
             container.style.gridTemplateColumns = " ".join(gtc)
             
@@ -243,7 +242,6 @@
                     div.onclick = make_handler(r, c)
                     container.appendChild(div)
                     
-                    # 짝꿍 모드이면서 짝수 번째 열이고 마지막 열이 아닐 때 빈 div(복도) 추가
                     if pair_mode and c % 2 == 1 and c != cols - 1:
                         gap_div = js_document.createElement("div")
                         container.appendChild(gap_div)
@@ -350,10 +348,9 @@
                 cols = len(result_grid[0])
                 pair_mode = document.querySelector("#pair-mode").checked
                 
-                # 띄어앉기(복도) 폭 계산
                 num_gaps = (cols // 2) - 1 if cols % 2 == 0 else (cols // 2)
                 if num_gaps < 0: num_gaps = 0
-                gap_width = 15 # 분단 사이 폭 (mm)
+                gap_width = 15 
                 
                 available_width = 270 
                 if pair_mode:
@@ -363,38 +360,39 @@
 
                 pdf = FPDF(orientation='L', unit='mm', format='A4')
                 pdf.add_page()
-                pdf.add_font("NanumGothic", "", "NanumGothic-Regular.ttf")
-                pdf.set_font("NanumGothic", size=20)
                 
-                pdf.cell(0, 15, "학급 자리 배치도", ln=True, align='C')
+                # 정규(일반) 폰트와 볼드 폰트 모두 등록
+                pdf.add_font("NanumGothic", "", "NanumGothic-Regular.ttf")
+                pdf.add_font("NanumGothic", "B", "NanumGothic-Bold.ttf")
+                
+                pdf.set_font("NanumGothic", size=20)
+                pdf.cell(w=0, h=15, text="학급 자리 배치도", new_x="LMARGIN", new_y="NEXT", align='C')
                 pdf.ln(10)
+                
                 pdf.set_font("NanumGothic", size=14)
                 
                 for r_idx, row in enumerate(result_grid):
-                    pdf.set_x(15) # 좌측 여백 설정
+                    pdf.set_x(15) 
                     
                     for c_idx, s in enumerate(row):
-                        state = seat_states.get((r_idx, c_idx))
-                        
-                        # 내용이 있든 없든 반드시 2줄 높이(' \n ')를 유지하도록 처리 (칸 크기 통일)
+                        # PDF에는 빈 자리나 제외된 자리를 모두 순수한 공백(텍스트 없음)으로 처리
                         if s:
-                            txt = f"{s['num']}\n{s['name']}"
-                        elif state == "excluded":
-                            txt = "X\n " 
+                            # 마크다운 적용: 번호는 일반, 이름은 앞뒤로 **를 붙여 볼드로 표시
+                            txt = f"{s['num']}\n**{s['name']}**"
                         else:
                             txt = " \n "
                         
                         x, y = pdf.get_x(), pdf.get_y()
-                        pdf.multi_cell(cell_width, 10, txt, border=1, align='C')
+                        # markdown=True 옵션을 켜서 **이름** 부분이 볼드로 변환되게 설정
+                        pdf.multi_cell(w=cell_width, h=10, text=txt, border=1, align='C', markdown=True)
                         
-                        # 짝꿍 모드일 때 X축 좌표 이동 (복도 추가)
                         next_x = x + cell_width
                         if pair_mode and c_idx % 2 == 1 and c_idx != cols - 1:
                             next_x += gap_width
                             
                         pdf.set_xy(next_x, y)
                     
-                    pdf.ln(20) # 다음 행으로 이동
+                    pdf.ln(20)
 
                 pdf_bytes = bytearray(pdf.output())
                 js_array = Uint8Array.new(len(pdf_bytes))

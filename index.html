@@ -53,7 +53,7 @@
     </div>
 
     <div class="main-container">
-        <!-- 왼쪽 사이드바 (설정 및 명렬표) -->
+        <!-- 왼쪽 사이드바 -->
         <div class="sidebar">
             <div class="config-group">
                 <label>1. 명단 관리</label>
@@ -96,13 +96,13 @@
         </div>
     </div>
 
-    <!-- 파이썬 환경 설정 (폰트 다운로드) -->
+    <!-- 파이썬 환경 설정: 구글 폰트 원본 저장소에서 확실한 TTF 파일 다운로드 -->
     <py-config>
         packages = ["fpdf2", "openpyxl"]
         
         [[fetch]]
-        from = "https://cdn.jsdelivr.net/gh/webfontworld/naver/"
-        files = ["NanumGothic.ttf"]
+        from = "https://raw.githubusercontent.com/google/fonts/main/ofl/nanumgothic/"
+        files = ["NanumGothic-Regular.ttf"]
     </py-config>
 
     <script type="py">
@@ -118,7 +118,7 @@
         result_grid = None
         selected_for_swap = None
 
-        # --- UI 업데이트 함수 (특별대상 체크박스 포함) ---
+        # --- UI 업데이트 ---
         def update_roster_ui():
             roster_div = document.querySelector("#roster")
             roster_div.innerHTML = ""
@@ -131,12 +131,10 @@
                 item = js_document.createElement("div")
                 item.className = "student-item"
                 
-                # 학생 정보
                 info = js_document.createElement("div")
                 info.className = "student-info"
                 info.innerHTML = f"<span style='color:#777; width:20px;'>{s['num']}</span> <strong>{s['name']}</strong>"
                 
-                # 특별대상 체크박스
                 label = js_document.createElement("label")
                 label.className = "special-toggle"
                 label.style.color = "#e74c3c" if s.get('special') else "#999"
@@ -145,13 +143,10 @@
                 cb.type = "checkbox"
                 cb.checked = s.get('special', False)
                 
-                # 체크박스 이벤트 클로저
                 def make_toggle(index, lbl):
                     def handler(e):
                         students[index]['special'] = e.target.checked
                         lbl.style.color = "#e74c3c" if e.target.checked else "#999"
-                        
-                        # 체크된 학생 수 계산
                         scount = sum(1 for st in students if st['special'])
                         document.querySelector("#status-text").innerText = f"총 {len(students)}명 (특별대상: {scount}명)"
                     return handler
@@ -244,7 +239,6 @@
             global result_grid, selected_for_swap
             el = document.querySelector(f"#seat-{r}-{c}")
             
-            # 자리 배치 후에는 '자리 바꾸기' 기능으로 작동
             if result_grid: 
                 if selected_for_swap is None:
                     selected_for_swap = (r, c)
@@ -273,7 +267,6 @@
                     selected_for_swap = None
                 return
             
-            # 자리 배치 전에는 '상태 변경 (제외, 특별, 일반)' 기능으로 작동
             curr = seat_states.get((r,c), "normal")
             new_state = "excluded" if curr == "normal" else "special" if curr == "excluded" else "normal"
             seat_states[(r,c)] = new_state
@@ -281,7 +274,7 @@
             el.className = f"seat {new_state}"
             el.innerText = "X" if new_state == "excluded" else "★특별" if new_state == "special" else "빈 자리"
 
-        # --- 3. 배치 실행 (특별 구역 우선 배정 로직 포함) ---
+        # --- 3. 배치 실행 ---
         @when("click", "#arrange-btn")
         def arrange_seats(event):
             global result_grid, selected_for_swap
@@ -298,7 +291,6 @@
             cols = int(document.querySelector("#cols").value)
             result_grid = [[None for _ in range(cols)] for _ in range(rows)]
             
-            # 자리 분류
             special_seats = []
             normal_seats = []
             for r in range(rows):
@@ -307,11 +299,9 @@
                     if state == "special": special_seats.append((r,c))
                     elif state == "normal": normal_seats.append((r,c))
             
-            # 학생 분류
             special_students = [s for s in students if s.get('special')]
             normal_students = [s for s in students if not s.get('special')]
             
-            # 예외 처리: 특별 자리가 부족할 때
             if len(special_students) > len(special_seats):
                 window.alert(f"⚠️ 설정된 '★특별' 자리({len(special_seats)}개)보다 특별 대상자({len(special_students)}명)가 많습니다!\n자리를 더 지정하거나 대상자를 줄여주세요.")
                 return
@@ -321,18 +311,15 @@
             random.shuffle(special_seats)
             random.shuffle(normal_seats)
             
-            # 1. 특별 대상자를 특별 자리에 먼저 배정
             for r, c in special_seats:
                 if special_students:
                     s = special_students.pop()
                     result_grid[r][c] = s
                     document.querySelector(f"#seat-{r}-{c}").innerText = f"{s['num']}\n{s['name']}"
                 else:
-                    # 남는 특별 자리는 일반 자리로 편입
                     normal_seats.append((r,c))
             
-            # 2. 남은 일반 학생들을 일반 자리(남은 특별 자리 포함)에 배정
-            random.shuffle(normal_seats) # 일반 자리에 편입된 특별 자리를 섞어줌
+            random.shuffle(normal_seats) 
             for r, c in normal_seats:
                 if normal_students:
                     s = normal_students.pop()
@@ -351,7 +338,9 @@
             try:
                 pdf = FPDF(orientation='L', unit='mm', format='A4')
                 pdf.add_page()
-                pdf.add_font("NanumGothic", "", "NanumGothic.ttf")
+                
+                # 업데이트된 폰트 파일명 사용
+                pdf.add_font("NanumGothic", "", "NanumGothic-Regular.ttf")
                 pdf.set_font("NanumGothic", size=20)
                 
                 pdf.cell(0, 15, "학급 자리 배치도", ln=True, align='C')

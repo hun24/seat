@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스마트 자리 배치기 Web</title>
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+    <style>
+        :root { --primary: #4a90e2; --success: #2ecc71; --bg: #f4f7f6; --dark: #34495e; --danger: #e74c3c; }
+        body { font-family: 'Malgun Gothic', 'Nanum Gothic', sans-serif; background-color: var(--bg); padding: 20px; color: #333; margin: 0; }
+        .header { text-align: center; margin-bottom: 20px; color: var(--dark); }
+        
+        .main-container { display: flex; gap: 20px; max-width: 1300px; margin: 0 auto; align-items: flex-start; }
+        
+        /* 왼쪽 패널 */
+        .sidebar { width: 360px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 15px; flex-shrink: 0; }
+        .config-group { border-bottom: 1px solid #eee; padding-bottom: 15px; display: flex; flex-direction: column; gap: 8px; }
+        .config-group:last-child { border: none; padding-bottom: 0; }
+        .config-group label { font-size: 13px; font-weight: bold; color: #555; }
+        
+        /* 파일 업로드 영역 */
+        .drop-zone { border: 2px dashed var(--primary); border-radius: 8px; padding: 15px 10px; text-align: center; background-color: #f8fbff; color: var(--primary); cursor: pointer; transition: all 0.2s; display: block; margin-bottom: 5px; }
+        .drop-zone:hover, .drop-zone.dragover { background-color: #e3f2fd; border-color: #1976d2; color: #1976d2; }
+        .drop-zone span { font-size: 11px; color: #888; display: block; margin-top: 5px; }
+
+        /* 명렬표 리스트 영역 */
+        .roster-container { border: 1px solid #ddd; border-radius: 6px; padding: 10px; height: 180px; overflow-y: auto; background: #fafafa; }
+        .student-item { padding: 6px 8px; border-bottom: 1px solid #eee; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+        .student-item:last-child { border-bottom: none; }
+        .student-info { display: flex; gap: 10px; align-items: center; }
+        .role-select { padding: 2px 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; background-color: #fff; }
+        .special-toggle { font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 2px; }
+        
+        /* 짝꿍 묶기 영역 */
+        .pair-container { display: flex; gap: 5px; align-items: center; }
+        .pair-container select { flex: 1; padding: 5px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; }
+        #pair-list { margin-top: 5px; font-size: 12px; max-height: 80px; overflow-y: auto; }
+        .pair-item { background: #e3f2fd; padding: 4px 8px; border-radius: 4px; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .pair-item span { font-weight: bold; color: #1976d2; }
+        .pair-remove { cursor: pointer; color: var(--danger); font-weight: bold; }
+        
+        /* 오른쪽 교실 화면 */
+        .content { flex-grow: 1; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-height: 600px; }
+        
+        .classroom-grid { display: flex; flex-direction: column; gap: 10px; align-items: center; padding: 20px; }
+        .classroom-row { display: flex; gap: 10px; justify-content: center; width: 100%; }
+        
+        .seat { width: 94px; height: 68px; border: 2px solid #ddd; display: flex; flex-direction: column; align-items: center; 
+                justify-content: center; text-align: center; font-weight: bold; cursor: pointer; border-radius: 8px; font-size: 13px; transition: 0.2s; background: #fff; position: relative; }
+        .seat:hover { transform: translateY(-2px); border-color: var(--primary); }
+        .seat.excluded { background-color: #eee; color: #bbb; border-style: dashed; }
+        .seat.special { background-color: #e3f2fd; border-color: #2196f3; color: #1976d2; }
+        .seat.selected { border: 3px solid var(--danger); background-color: #ffebee; transform: scale(1.05); z-index: 1; box-shadow: 0 4px 8px rgba(231,76,60,0.2); }
+        .seat-text { white-space: pre-line; line-height: 1.4; }
+        
+        .desk { width: 320px; background: var(--dark); color: white; padding: 12px; text-align: center; margin-bottom: 25px; border-radius: 8px; font-weight: bold; }
+        
+        button { padding: 10px 15px; cursor: pointer; border: none; border-radius: 6px; background: var(--primary); color: white; font-weight: bold; transition: 0.2s; width: 100%; }
+        button:hover { opacity: 0.9; }
+        .btn-success { background: var(--success); }
+        .btn-info { background: #e67e22; }
+        .btn-small { width: auto; padding: 6px 12px; font-size: 12px; }
+        .row-col-inputs { display: flex; gap: 10px; align-items: center; }
+        input[type="number"], select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        #status-text { font-size: 12px; color: var(--primary); font-weight: bold; text-align: center; }
+        
+        /* 모달 스타일 */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 20px; border-radius: 12px; width: 320px; max-height: 80vh; display: flex; flex-direction: column; gap: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+        .modal-body { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+        .modal-student-btn { width: 100%; padding: 8px; border: 1px solid #e3f2fd; border-radius: 6px; background: #f8fbff; text-align: left; cursor: pointer; font-size: 13px; font-weight: bold; }
+        .modal-student-btn:hover { background: #e3f2fd; color: #1976d2; }
+        .modal-student-btn:disabled { background: #eee; color: #aaa; cursor: not-allowed; border-color: #ddd; }
+        .checkbox-label { font-weight: normal !important; font-size: 12px !important; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>🏫 스마트 자리 배치기</h2>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="config-group">
+                <label>1. 명단 관리</label>
+                <input type="file" id="file-upload" accept=".txt,.xlsx" style="display:none">
+                <label for="file-upload" id="drop-zone" class="drop-zone">
+                    📂 <strong>클릭</strong>하여 파일 선택
+                    <span>또는 이곳으로 드래그 앤 드롭 (.txt, .xlsx)</span>
+                </label>
+                <div id="status-text">학생이 없습니다.</div>
+            </div>
+
+            <div class="config-group">
+                <label>📋 명렬표 (직책 설정 및 특별석 우선체크)</label>
+                <div id="roster" class="roster-container">
+                    <div style="color:#999; text-align:center; padding-top:20px;">명단을 불러오세요</div>
+                </div>
+            </div>
+            
+            <div class="config-group">
+                <label>🤝 짝 지정 (같은 모둠 내 배정 우선)</label>
+                <div class="pair-container">
+                    <select id="pair1"><option value="">학생1 선택</option></select>
+                    <select id="pair2"><option value="">학생2 선택</option></select>
+                    <button id="add-pair-btn" class="btn-small">묶기</button>
+                </div>
+                <div id="pair-list"></div>
+            </div>
+
+            <div class="config-group">
+                <label>2. 격자 설정</label>
+                <div class="row-col-inputs" style="margin-bottom: 5px;">
+                    행(세로줄): <input type="number" id="rows" value="5" min="1" style="width:50px;">
+                    열(가로줄): <input type="number" id="cols" value="6" min="1" style="width:50px;">
+                </div>
+                <label>모둠 배치 알고리즘 선택</label>
+                <select id="layout-type">
+                    <option value="normal">일반 격자 (여백 없음)</option>
+                    <option value="pair">2인 1조 기준 배정 (2줄마다 여백)</option>
+                    <option value="group4">4인 모둠 기준 (2x2 블록)</option>
+                    <option value="group6">6인 모둠 기준 (3x2 블록)</option>
+                </select>
+                <button id="create-grid-btn" style="background: #2c3e50; margin-top: 5px;">교실 틀 생성</button>
+            </div>
+
+            <div class="config-group">
+                <label>🖱️ 자리를 클릭할 때 동작</label>
+                <select id="click-mode">
+                    <option value="status">자리 상태 설정 (일반/제외X/특별★)</option>
+                    <option value="manual">🎯 학생 지정 배치 (특정 학생 고정 고르기)</option>
+                    <option value="swap">🔄 자리 서로 바꾸기 (완료 후 위치 교환)</option>
+                </select>
+            </div>
+
+            <div class="config-group">
+                <label>3. 배치 및 저장</label>
+                <label class="checkbox-label" style="margin-bottom: 5px; background: #f8fbff; padding: 6px; border-radius: 4px; border: 1px solid #e3f2fd;">
+                    <input type="checkbox" id="toggle-role" checked> 🏷️ 조장(⭐)/부조장(🔷) 번호 옆 표시
+                </label>
+                <button id="arrange-btn" class="btn-success" style="margin-bottom: 5px;">랜덤 배치 시작 (지정석 제외)</button>
+                <button id="pdf-btn" class="btn-info">PDF 다운로드</button>
+            </div>
+        </div>
+
+        <div class="content">
+            <div id="classroom" class="classroom-grid">
+                <div style="text-align:center; color:#999; margin-top:50px;">
+                    '교실 틀 생성' 버튼을 눌러주세요.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="student-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 style="margin:0; font-size:15px; text-align:center; border-bottom:2px solid var(--primary); padding-bottom:8px;">🎯 이 자리에 배치할 학생 선택</h3>
+            <div id="modal-student-list" class="modal-body"></div>
+            <button id="close-modal-btn" style="background:var(--danger); padding:8px;">창 닫기</button>
+        </div>
+    </div>
+
+    <py-config>
+        packages = ["fpdf2", "openpyxl"]
+        
+        [[fetch]]
+        from = "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/nanumgothic/"
+        files = ["NanumGothic-Regular.ttf", "NanumGothic-Bold.ttf"]
+    </py-config>
+
+    <script type="py">
+        import random
+        import io
+        import openpyxl
+        from fpdf import FPDF
+        from pyscript import when, window
+        from js import Uint8Array, Blob, URL, document as js_document
+        from pyodide.ffi import create_proxy
+
+        students = []
+        linked_pairs = [] 
+        seat_states = {} 
+        result_grid = None
+        selected_for_swap = None
+        current_manual_seat = None
+        
+        g_rows = 5
+        g_cols = 6
+
+        def get_group_id(r, c, layout):
+            if layout == "group4":
+                return (r // 2) * 10 + (c // 2)
+            elif layout == "group6":
+                # 3x2 형태: 세로 3줄, 가로 2줄 단위 묶음
+                return (r // 3) * 10 + (c // 2)
+            elif layout == "pair":
+                return (r * 10) + (c // 2)
+            else:
+                return r
+
+        def get_student_seat_text(s):
+            if not s: return "빈 자리"
+            show_role = js_document.getElementById("toggle-role").checked
+            role_ico = ""
+            if show_role:
+                role_ico = "⭐" if s.get('role') == 'leader' else "🔷" if s.get('role') == 'sub_leader' else ""
+            return f"{s['num']}{role_ico}\n{s['name']}"
+
+        def update_roster_ui():
+            roster_div = js_document.getElementById("roster")
+            roster_div.innerHTML = ""
+            
+            p1_select = js_document.getElementById("pair1")
+            p2_select = js_document.getElementById("pair2")
+            p1_select.innerHTML = '<option value="">학생1 선택</option>'
+            p2_select.innerHTML = '<option value="">학생2 선택</option>'
+            
+            if not students:
+                roster_div.innerHTML = "<div style='color:#999; text-align:center; padding-top:20px;'>명단을 불러오세요</div>"
+                return
+                
+            for i, s in enumerate(students):
+                item = js_document.createElement("div")
+                item.className = "student-item"
+                
+                info = js_document.createElement("div")
+                info.className = "student-info"
+                info.innerHTML = f"<span style='color:#777; width:20px;'>{s['num']}</span> <strong>{s['name']}</strong>"
+                
+                ctrls = js_document.createElement("div")
+                ctrls.style.display = "flex"
+                ctrls.style.gap = "6px"
+                ctrls.style.alignItems = "center"
+                
+                role_sel = js_document.createElement("select")
+                role_sel.className = "role-select"
+                
+                roles_opts = [("normal", "일반"), ("leader", "⭐조장"), ("sub_leader", "🔷부조장")]
+                for val, label_text in roles_opts:
+                    opt = js_document.createElement("option")
+                    opt.value = val
+                    opt.innerText = label_text
+                    if s.get('role', 'normal') == val: opt.selected = True
+                    role_sel.appendChild(opt)
+                
+                def make_role_handler(idx):
+                    def handler(e):
+                        students[idx]['role'] = e.target.value
+                        refresh_classroom_ui()
+                    return handler
+                role_sel.addEventListener("change", create_proxy(make_role_handler(i)))
+                ctrls.appendChild(role_sel)
+                
+                label = js_document.createElement("label")
+                label.className = "special-toggle"
+                label.style.color = "#e74c3c" if s.get('special') else "#999"
+                
+                cb = js_document.createElement("input")
+                cb.type = "checkbox"
+                cb.checked = s.get('special', False)
+                
+                def make_toggle(index, lbl):
+                    def handler(e):
+                        students[index]['special'] = e.target.checked
+                        lbl.style.color = "#e74c3c" if e.target.checked else "#999"
+                        scount = sum(1 for st in students if st['special'])
+                        js_document.getElementById("status-text").innerText = f"총 {len(students)}명 (특별석 대상: {scount}명)"
+                    return handler
+                    
+                cb.addEventListener("change", create_proxy(make_toggle(i, label)))
+                label.appendChild(cb)
+                label.appendChild(js_document.createTextNode(" 특"))
+                ctrls.appendChild(label)
+                
+                item.appendChild(info)
+                item.appendChild(ctrls)
+                roster_div.appendChild(item)
+
+                opt1 = js_document.createElement("option")
+                opt1.value = s['num']
+                opt1.innerText = f"{s['num']}. {s['name']}"
+                p1_select.appendChild(opt1)
+                
+                opt2 = js_document.createElement("option")
+                opt2.value = s['num']
+                opt2.innerText = f"{s['num']}. {s['name']}"
+                p2_select.appendChild(opt2)
+
+        def render_pairs():
+            pl = js_document.getElementById("pair-list")
+            pl.innerHTML = ""
+            student_dict = {s['num']: s for s in students}
+            for idx, (n1, n2) in enumerate(linked_pairs):
+                name1 = student_dict.get(n1, {}).get('name', n1)
+                name2 = student_dict.get(n2, {}).get('name', n2)
+                div = js_document.createElement("div")
+                div.className = "pair-item"
+                div.innerHTML = f"<span>🤝 {n1}.{name1} - {n2}.{name2}</span>"
+                rm_btn = js_document.createElement("span")
+                rm_btn.className = "pair-remove"
+                rm_btn.innerText = "X"
+                def make_remover(i):
+                    def handler(e):
+                        linked_pairs.pop(i)
+                        render_pairs()
+                    return handler
+                rm_btn.addEventListener("click", create_proxy(make_remover(idx)))
+                div.appendChild(rm_btn)
+                pl.appendChild(div)
+
+        @when("click", "#add-pair-btn")
+        def add_pair(event):
+            val1 = js_document.getElementById("pair1").value
+            val2 = js_document.getElementById("pair2").value
+            if not val1 or not val2: return
+            if val1 == val2: return
+            for p in linked_pairs:
+                if val1 in p or val2 in p: return
+            linked_pairs.append((val1, val2))
+            render_pairs()
+            js_document.getElementById("pair1").value = ""
+            js_document.getElementById("pair2").value = ""
+
+        async def process_file_data(file_list):
+            global students, linked_pairs
+            if not file_list or file_list.length == 0: return
+            file = file_list.item(0)
+            try:
+                js_buf = await file.arrayBuffer()
+                js_array = Uint8Array.new(js_buf)
+                content = js_array.to_bytes()
+                students, linked_pairs = [], []
+                if file.name.endswith('.xlsx'):
+                    f = io.BytesIO(content)
+                    wb = openpyxl.load_workbook(f, data_only=True)
+                    ws = wb.active
+                    for row in ws.iter_rows(min_row=1, values_only=True):
+                        if row[0] is not None: 
+                            num_str = str(row[0]).strip().replace('.0', '')
+                            if num_str in ['번호', '학번', '순번', 'no', 'No', 'num']: continue
+                            name_str = str(row[1]).strip() if len(row) > 1 and row[1] is not None else ""
+                            if name_str == 'None': name_str = ""
+                            students.append({'num': num_str, 'name': name_str, 'special': False, 'role': 'normal'})
+                else:
+                    try: text = content.decode('utf-8')
+                    except UnicodeDecodeError: text = content.decode('cp949', errors='ignore')
+                    for line in text.splitlines():
+                        if line.strip():
+                            parts = line.split(maxsplit=1)
+                            num_str = parts[0].replace('.0', '')
+                            if num_str in ['번호', '학번', '순번']: continue
+                            students.append({'num': num_str, 'name': parts[1] if len(parts)==2 else parts[0], 'special': False, 'role': 'normal'})
+                
+                if not students: return
+                js_document.getElementById("status-text").innerText = f"총 {len(students)}명 (특별석 대상: 0명)"
+                update_roster_ui()
+                render_pairs()
+            except Exception as e:
+                window.alert(f"❌ 명단 읽기 오류: {str(e)}")
+
+        @when("change", "#file-upload")
+        async def handle_file_change(event):
+            await process_file_data(event.target.files)
+            event.target.value = ""
+
+        @when("dragover", "#drop-zone")
+        def handle_dragover(event):
+            event.preventDefault()
+            js_document.getElementById("drop-zone").classList.add("dragover")
+
+        @when("dragleave", "#drop-zone")
+        def handle_dragleave(event):
+            event.preventDefault()
+            js_document.getElementById("drop-zone").classList.remove("dragover")
+
+        @when("drop", "#drop-zone")
+        async def handle_drop(event):
+            event.preventDefault()
+            js_document.getElementById("drop-zone").classList.remove("dragover")
+            await process_file_data(event.dataTransfer.files)
+
+
+        @when("click", "#create-grid-btn")
+        def create_grid(event):
+            global seat_states, result_grid, selected_for_swap, g_rows, g_cols
+            try:
+                g_rows = int(js_document.getElementById("rows").value)
+                g_cols = int(js_document.getElementById("cols").value)
+            except Exception as e:
+                window.alert("행과 열 칸에 올바른 숫자를 입력해 주세요.")
+                return
+            
+            layout_type = js_document.getElementById("layout-type").value
+            
+            container = js_document.getElementById("classroom")
+            container.innerHTML = ""
+            
+            desk = js_document.createElement("div")
+            desk.className = "desk"
+            desk.innerText = "[ 교 탁 ]"
+            container.appendChild(desk)
+
+            seat_states = {}
+            result_grid = [[None for _ in range(g_cols)] for _ in range(g_rows)]
+            selected_for_swap = None
+            
+            for r in range(g_rows):
+                row_div = js_document.createElement("div")
+                row_div.className = "classroom-row"
+                
+                # [세로 여백 설정]
+                if layout_type == "group4":
+                    if r % 2 == 1 and r < g_rows - 1:
+                        row_div.style.marginBottom = "24px"
+                elif layout_type == "group6":
+                    # 3x2 모둠은 세로로 3줄마다 하단 여백 추가
+                    if r % 3 == 2 and r < g_rows - 1:
+                        row_div.style.marginBottom = "24px"
+                
+                for c in range(g_cols):
+                    seat_states[(r,c)] = "normal"
+                    div = js_document.createElement("div")
+                    div.className = "seat"
+                    div.id = f"seat-{r}-{c}"
+                    
+                    # [가로 여백 설정]
+                    if layout_type in ["pair", "group4", "group6"]:
+                        # 2인조, 4인모둠(2x2), 6인모둠(3x2) 모두 가로 방향으로는 2칸마다 우측 복도가 벌어짐
+                        if c % 2 == 1 and c < g_cols - 1:
+                            div.style.marginRight = "28px"
+                    # 'normal'(일반격자)일 때는 마진(여백)이 설정되지 않으므로 빈틈없이 채워집니다.
+                    
+                    span = js_document.createElement("span")
+                    span.className = "seat-text"
+                    span.innerText = "빈 자리"
+                    div.appendChild(span)
+                    
+                    def make_handler(row, col):
+                        def handler(e):
+                            handle_seat_click(row, col)
+                        return handler
+                    
+                    div.addEventListener("click", create_proxy(make_handler(r, c)))
+                    row_div.appendChild(div)
+                    
+                container.appendChild(row_div)
+
+
+        def handle_seat_click(r, c):
+            global result_grid, selected_for_swap
+            click_mode = js_document.getElementById("click-mode").value
+            el = js_document.getElementById(f"seat-{r}-{c}")
+            txt_el = js_document.querySelector(f"#seat-{r}-{c} .seat-text")
+            
+            if click_mode == "status":
+                if result_grid[r][c] is not None: return
+                curr = seat_states.get((r,c), "normal")
+                new_state = "excluded" if curr == "normal" else "special" if curr == "excluded" else "normal"
+                seat_states[(r,c)] = new_state
+                
+                el.className = f"seat {new_state}"
+                txt_el.innerText = "X" if new_state == "excluded" else "★특별" if new_state == "special" else "빈 자리"
+                return
+                
+            elif click_mode == "manual":
+                if seat_states.get((r,c)) == "excluded": return
+                open_student_modal(r, c)
+                return
+                
+            elif click_mode == "swap":
+                if seat_states.get((r,c)) == "excluded": return
+                if selected_for_swap is None:
+                    selected_for_swap = (r, c)
+                    el.classList.add("selected")
+                elif selected_for_swap == (r, c):
+                    selected_for_swap = None
+                    el.classList.remove("selected")
+                else:
+                    r1, c1 = selected_for_swap
+                    r2, c2 = r, c
+                    result_grid[r1][c1], result_grid[r2][c2] = result_grid[r2][c2], result_grid[r1][c1]
+                    
+                    refresh_classroom_ui()
+                    el1 = js_document.getElementById(f"seat-{r1}-{c1}")
+                    if el1: el1.classList.remove("selected")
+                    selected_for_swap = None
+
+
+        def open_student_modal(r, c):
+            global current_manual_seat
+            current_manual_seat = (r, c)
+            
+            modal = js_document.getElementById("student-modal")
+            list_div = js_document.getElementById("modal-student-list")
+            list_div.innerHTML = ""
+            
+            clear_btn = js_document.createElement("button")
+            clear_btn.innerText = "❌ 이 자리 다시 비우기"
+            clear_btn.style.background = "#95a5a6"
+            clear_btn.style.marginBottom = "8px"
+            clear_btn.style.padding = "6px"
+            
+            def make_clear_job(row, col):
+                def handler(e):
+                    result_grid[row][col] = None
+                    js_document.querySelector(f"#seat-{row}-{col} .seat-text").innerText = "빈 자리"
+                    js_document.getElementById("student-modal").style.display = "none"
+                return handler
+            clear_btn.addEventListener("click", create_proxy(make_clear_job(r, c)))
+            list_div.appendChild(clear_btn)
+            
+            placed_nums = set()
+            for ro in range(g_rows):
+                for co in range(g_cols):
+                    if result_grid[ro][co] is not None and (ro, co) != (r, c):
+                        placed_nums.add(result_grid[ro][co]['num'])
+                        
+            for s in students:
+                btn = js_document.createElement("button")
+                btn.className = "modal-student-btn"
+                
+                show_role = js_document.getElementById("toggle-role").checked
+                role_tag = ""
+                if show_role:
+                    role_tag = " (조장)" if s.get('role')=='leader' else " (부조장)" if s.get('role')=='sub_leader' else ""
+                
+                btn.innerText = f"{s['num']}. {s['name']}{role_tag}"
+                
+                if s['num'] in placed_nums:
+                    btn.disabled = True
+                else:
+                    def make_select_job(row, col, st_obj):
+                        def handler(e):
+                            result_grid[row][col] = st_obj
+                            js_document.querySelector(f"#seat-{row}-{col} .seat-text").innerText = get_student_seat_text(st_obj)
+                            js_document.getElementById("student-modal").style.display = "none"
+                        return handler
+                    btn.addEventListener("click", create_proxy(make_select_job(r, c, s)))
+                    
+                list_div.appendChild(btn)
+            modal.style.display = "flex"
+
+        @when("click", "#close-modal-btn")
+        def close_modal(event):
+            js_document.getElementById("student-modal").style.display = "none"
+
+        def refresh_classroom_ui():
+            if not result_grid: return
+            for r in range(g_rows):
+                for c in range(g_cols):
+                    txt_el = js_document.querySelector(f"#seat-{r}-{c} .seat-text")
+                    if not txt_el: continue
+                    s = result_grid[r][c]
+                    if s:
+                        txt_el.innerText = get_student_seat_text(s)
+                    else:
+                        state = seat_states.get((r,c))
+                        txt_el.innerText = "X" if state == "excluded" else "★특별" if state == "special" else "빈 자리"
+
+        @when("change", "#toggle-role")
+        def on_toggle_role_change(event):
+            refresh_classroom_ui()
+
+
+        @when("click", "#arrange-btn")
+        def arrange_seats(event):
+            global result_grid, selected_for_swap
+            if not students: return
+            if selected_for_swap:
+                prev_el = js_document.getElementById(f"seat-{selected_for_swap[0]}-{selected_for_swap[1]}")
+                if prev_el: prev_el.classList.remove("selected")
+                selected_for_swap = None
+            
+            layout_type = js_document.getElementById("layout-type").value
+            
+            placed_nums = set()
+            for r in range(g_rows):
+                for c in range(g_cols):
+                    if result_grid[r][c] is not None:
+                        placed_nums.add(result_grid[r][c]['num'])
+            
+            rem_students = [s for s in students if s['num'] not in placed_nums]
+            rem_leaders = [s for s in rem_students if s.get('role') == 'leader']
+            rem_sub_leaders = [s for s in rem_students if s.get('role') == 'sub_leader']
+            rem_normals = [s for s in rem_students if s.get('role', 'normal') == 'normal']
+            
+            group_has_leader = set()
+            group_has_sub_leader = set()
+            for r in range(g_rows):
+                for c in range(g_cols):
+                    s = result_grid[r][c]
+                    if s:
+                        g_id = get_group_id(r, c, layout_type)
+                        if s.get('role') == 'leader': group_has_leader.add(g_id)
+                        if s.get('role') == 'sub_leader': group_has_sub_leader.add(g_id)
+            
+            group_seats = {}
+            for r in range(g_rows):
+                for c in range(g_cols):
+                    if seat_states.get((r,c)) == "excluded": continue
+                    if result_grid[r][c] is not None: continue
+                    g_id = get_group_id(r, c, layout_type)
+                    if g_id not in group_seats: group_seats[g_id] = []
+                    group_seats[g_id].append((r, c))
+            
+            random.shuffle(rem_leaders)
+            random.shuffle(rem_sub_leaders)
+            random.shuffle(rem_normals)
+            
+            for leader in rem_leaders:
+                eligible_groups = [g for g, seats in group_seats.items() if seats and g not in group_has_leader]
+                if not eligible_groups: eligible_groups = [g for g, seats in group_seats.items() if seats]
+                if eligible_groups:
+                    g_choice = random.choice(eligible_groups)
+                    r, c = group_seats[g_choice].pop(random.randrange(len(group_seats[g_choice])))
+                    result_grid[r][c] = leader
+                    group_has_leader.add(g_choice)
+            
+            for sub in rem_sub_leaders:
+                eligible_groups = [g for g, seats in group_seats.items() if seats and g not in group_has_sub_leader]
+                if not eligible_groups: eligible_groups = [g for g, seats in group_seats.items() if seats]
+                if eligible_groups:
+                    g_choice = random.choice(eligible_groups)
+                    r, c = group_seats[g_choice].pop(random.randrange(len(group_seats[g_choice])))
+                    result_grid[r][c] = sub
+                    group_has_sub_leader.add(g_choice)
+
+            student_dict = {s['num']: s for s in students}
+            for num1, num2 in linked_pairs:
+                if num1 in placed_nums or num2 in placed_nums: continue
+                s1, s2 = student_dict.get(num1), student_dict.get(num2)
+                if s1 not in rem_normals or s2 not in rem_normals: continue
+                
+                pair_placed = False
+                for g_id, seats in group_seats.items():
+                    if len(seats) >= 2:
+                        for i in range(len(seats)):
+                            for j in range(i+1, len(seats)):
+                                r1, c1 = seats[i]
+                                r2, c2 = seats[j]
+                                if r1 == r2 and abs(c1 - c2) == 1:
+                                    pos1 = seats.pop(j)
+                                    pos2 = seats.pop(i)
+                                    result_grid[pos1[0]][pos1[1]] = s1
+                                    result_grid[pos2[0]][pos2[1]] = s2
+                                    rem_normals.remove(s1)
+                                    rem_normals.remove(s2)
+                                    pair_placed = True
+                                    break
+                            if pair_placed: break
+                    if pair_placed: break
+
+            rs_special = [s for s in rem_normals if s.get('special')]
+            rs_normal = [s for s in rem_normals if not s.get('special')]
+            
+            all_leftover_seats = []
+            for g_id, seats in group_seats.items(): all_leftover_seats.extend(seats)
+                
+            leftover_special_seats = [pt for pt in all_leftover_seats if seat_states.get(pt) == "special"]
+            leftover_normal_seats = [pt for pt in all_leftover_seats if seat_states.get(pt) == "normal"]
+            
+            random.shuffle(leftover_special_seats)
+            random.shuffle(leftover_normal_seats)
+            
+            for s in rs_special:
+                if leftover_special_seats:
+                    r, c = leftover_special_seats.pop()
+                    result_grid[r][c] = s
+                elif leftover_normal_seats:
+                    r, c = leftover_normal_seats.pop()
+                    result_grid[r][c] = s
+                    
+            for s in rs_normal:
+                if leftover_normal_seats:
+                    r, c = leftover_normal_seats.pop()
+                    result_grid[r][c] = s
+                elif leftover_special_seats:
+                    r, c = leftover_special_seats.pop()
+                    result_grid[r][c] = s
+                    
+            refresh_classroom_ui()
+
+
+        @when("click", "#pdf-btn")
+        def save_pdf(event):
+            if not result_grid: return
+            try:
+                available_width = 270 
+                cell_width = available_width / g_cols
+
+                pdf = FPDF(orientation='L', unit='mm', format='A4')
+                pdf.add_page()
+                pdf.add_font("NanumGothic", "", "NanumGothic-Regular.ttf")
+                pdf.add_font("NanumGothic", "B", "NanumGothic-Bold.ttf")
+                
+                pdf.set_font("NanumGothic", size=20)
+                pdf.cell(w=0, h=15, text="학급 자리 배치도", new_x="LMARGIN", new_y="NEXT", align='C')
+                pdf.ln(5)
+                
+                pdf.set_font("NanumGothic", size=13)
+                
+                grid_to_save = []
+                for r in reversed(range(g_rows)):
+                    new_row = []
+                    for c in reversed(range(g_cols)):
+                        new_row.append( (r, c, result_grid[r][c]) )
+                    grid_to_save.append(new_row)
+
+                for r_idx, row_data in enumerate(grid_to_save):
+                    pdf.set_x(15) 
+                    for c_idx, (orig_r, orig_c, s) in enumerate(row_data):
+                        if s:
+                            show_role = js_document.getElementById("toggle-role").checked
+                            role_txt = "⭐" if (show_role and s.get('role')=='leader') else "🔷" if (show_role and s.get('role')=='sub_leader') else ""
+                            txt = f"{s['num']}{role_txt}\n**{s['name']}**"
+                        else:
+                            state = seat_states.get((orig_r, orig_c))
+                            txt = "X" if state=="excluded" else "빈자리"
+                        
+                        x, y = pdf.get_x(), pdf.get_y()
+                        pdf.multi_cell(w=cell_width, h=8, text=txt, border=1, align='C', markdown=True)
+                        pdf.set_xy(x + cell_width, y)
+                    pdf.ln(22)
+                
+                pdf.ln(3)
+                pdf.set_font("NanumGothic", "B", size=12)
+                pdf.set_fill_color(220, 220, 220) 
+                desk_w = 60
+                pdf.set_x((297 - desk_w) / 2) 
+                pdf.cell(w=desk_w, h=8, text="[ 교 탁 ]", border=1, new_x="LMARGIN", new_y="NEXT", align='C', fill=True)
+
+                pdf_bytes = bytearray(pdf.output())
+                js_array = Uint8Array.new(len(pdf_bytes))
+                js_array.assign(pdf_bytes)
+                
+                blob = Blob.new([js_array], {type: "application/pdf"})
+                url = URL.createObjectURL(blob)
+                link = js_document.createElement("a")
+                link.href = url
+                link.download = "자리배치도.pdf"
+                link.click()
+                URL.revokeObjectURL(url)
+            except Exception as e:
+                window.alert(f"PDF 저장 중 오류: {str(e)}")
+    </script>
+</body>
+</html>

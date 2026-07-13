@@ -475,7 +475,7 @@
                     result_grid[r1][c1], result_grid[r2][c2] = result_grid[r2][c2], result_grid[r1][c1]
                     
                     refresh_classroom_ui()
-                    el1 = js_document.getElementById(f"seat-{r1}-{c1}")
+                    el1 = js_document.getElementById(f"seat-{r1-{c1}")
                     if el1: el1.classList.remove("selected")
                     selected_for_swap = None
 
@@ -674,33 +674,21 @@
                 # 타이틀
                 pdf.set_font("NanumGothic", size=22)
                 pdf.cell(w=0, h=15, text="학급 자리 배치도", new_x="LMARGIN", new_y="NEXT", align='C')
-                pdf.ln(4)
-                
-                # 상단 교탁 배치 (화면과 동일하게 위쪽 중앙)
-                pdf.set_font("NanumGothic", "B", size=11)
-                pdf.set_fill_color(52, 73, 94) # 화면의 dark 테마 색상상
-                pdf.set_text_color(255, 255, 255)
-                desk_w = 70
-                pdf.set_x((297 - desk_w) / 2)
-                pdf.cell(w=desk_w, h=8, text="[ 교 탁 ]", border=0, new_x="LMARGIN", new_y="NEXT", align='C', fill=True)
-                pdf.ln(8)
+                pdf.ln(2)
                 
                 # 기본 텍스트 색상 및 폰트 복구
                 pdf.set_text_color(51, 51, 51)
                 pdf.set_font("NanumGothic", size=11)
 
-                # 모둠 여백 계산을 반영한 그리드 출력 좌표 설정
-                # 책상 실사이즈 26mm x 18mm
+                # 책상 실사이즈 및 간격 정의
                 seat_w = 26
                 seat_h = 18
-                
-                # 간격 설정
                 base_gap_x = 3   # 기본 옆자리 간격
                 split_gap_x = 8  # 분단/모둠 사이 가로 통로 여백
                 base_gap_y = 3   # 기본 앞뒤 간격
                 split_gap_y = 7  # 모둠 분리 세로 통로 여백
 
-                # 전체 구조 크기 미리 계산하여 중앙 정렬 여백 잡기
+                # 1단계: 가로 전체 폭 계산 및 중앙 정렬 여백 잡기
                 total_w = 0
                 for c in range(g_cols):
                     total_w += seat_w
@@ -709,17 +697,35 @@
                             total_w += split_gap_x
                         else:
                             total_w += base_gap_x
-                
                 start_x = (297 - total_w) / 2
-                start_y = pdf.get_y()
-
-                # 화면 순서대로 출력 (0행이 맨 위 분단 첫 줄)
-                current_y = start_y
+                
+                # 2단계: 180도 반전을 위해 세로 전체 높이를 역산하여 배치 시작 포인트 잡기
+                total_h = 0
                 for r in range(g_rows):
+                    total_h += seat_h
+                    if r < g_rows - 1:
+                        total_h += base_gap_y
+                        if layout_type == "group4" and r % 2 == 1:
+                            total_h += (split_gap_y - base_gap_y)
+                        elif layout_type == "group6" and r % 3 == 2:
+                            total_h += (split_gap_y - base_gap_y)
+                
+                # 30mm 지점부터 책상 영역 시작시 아래 배치될 공간 확보
+                start_y = 30
+                
+                # 3단계: 화면 배치 데이터를 180도 회전(역순) 처리하여 위에서부터 아래로 렌더링
+                # r_idx는 출력 상단줄(0번째)부터 아래(g_rows-1번째)까지 순서대로 실행됨
+                current_y = start_y
+                for r_idx in range(g_rows):
+                    # 180도 회전: 화면의 가장 아랫줄(g_rows - 1 - r_idx)을 PDF의 윗줄에 그린다.
+                    r = g_rows - 1 - r_idx
                     current_x = start_x
-                    for c in range(g_cols):
-                        s = result_grid[r][c]
+                    
+                    for c_idx in range(g_cols):
+                        # 180도 회전: 화면의 가장 우측열(g_cols - 1 - c_idx)을 PDF의 좌측열에 그린다.
+                        c = g_cols - 1 - c_idx
                         
+                        s = result_grid[r][c]
                         if s:
                             role_txt = "⭐" if (show_role and s.get('role')=='leader') else "🔷" if (show_role and s.get('role')=='sub_leader') else ""
                             txt = f"{s['num']}{role_txt}\n**{s['name']}**"
@@ -727,11 +733,10 @@
                             state = seat_states.get((r, c))
                             txt = "X" if state=="excluded" else ""
                         
-                        # 멀티셀을 이용해 지정 좌표에 책상 그리기
                         pdf.set_xy(current_x, current_y)
                         
-                        # 배경색 지정 (특별석은 하늘색 배경, 일반은 흰색)
-                        curr_state = seat_states.get((r,c))
+                        # 배경색 지정
+                        curr_state = seat_states.get((r, c))
                         if curr_state == "special":
                             pdf.set_fill_color(227, 242, 253)
                             pdf.multi_cell(w=seat_w, h=7.5, text=txt, border=1, align='C', markdown=True, fill=True)
@@ -742,20 +747,33 @@
                             pdf.set_fill_color(255, 255, 255)
                             pdf.multi_cell(w=seat_w, h=7.5, text=txt, border=1, align='C', markdown=True, fill=False)
                         
-                        # 다음 열 X 좌표 이동 (알고리즘별 가로 여백 부여)
+                        # 다음 열 X 좌표 누적 (여백 기준도 역방향 c값 기준으로 적용해야 완벽히 대칭됨)
                         current_x += seat_w
-                        if c < g_cols - 1:
-                            if layout_type in ["pair", "group4", "group6"] and c % 2 == 1:
+                        if c_idx < g_cols - 1:
+                            # 180도 대칭 위치의 간격 계산
+                            orig_c = c - 1
+                            if layout_type in ["pair", "group4", "group6"] and orig_c % 2 == 1:
                                 current_x += split_gap_x
                             else:
                                 current_x += base_gap_x
-                                
-                    # 다음 행 Y 좌표 이동 (알고리즘별 세로 여백 부여)
+                    
+                    # 다음 행 Y 좌표 누적 (여백 기준도 역방향 r값 기준으로 계산)
                     current_y += seat_h + base_gap_y
-                    if layout_type == "group4" and r % 2 == 1:
-                        current_y += split_gap_y - base_gap_y
-                    elif layout_type == "group6" and r % 3 == 2:
-                        current_y += split_gap_y - base_gap_y
+                    if r_idx < g_rows - 1:
+                        orig_r = r - 1
+                        if layout_type == "group4" and orig_r % 2 == 1:
+                            current_y += (split_gap_y - base_gap_y)
+                        elif layout_type == "group6" and orig_r % 3 == 2:
+                            current_y += (split_gap_y - base_gap_y)
+
+                # 4단계: 교탁을 최하단 중앙에 배치
+                pdf.ln(6)
+                pdf.set_font("NanumGothic", "B", size=11)
+                pdf.set_fill_color(52, 73, 94)
+                pdf.set_text_color(255, 255, 255)
+                desk_w = 70
+                pdf.set_xy((297 - desk_w) / 2, current_y + 2)
+                pdf.cell(w=desk_w, h=8, text="[ 교 탁 ]", border=0, align='C', fill=True)
 
                 # 파일 저장 및 브라우저 다운로드 트리거
                 pdf_bytes = bytearray(pdf.output())

@@ -475,7 +475,7 @@
                     result_grid[r1][c1], result_grid[r2][c2] = result_grid[r2][c2], result_grid[r1][c1]
                     
                     refresh_classroom_ui()
-                    el1 = js_document.getElementById(f"seat-{r1-{c1}")
+                    el1 = js_document.getElementById(f"seat-{r1}-{c1}")
                     if el1: el1.classList.remove("selected")
                     selected_for_swap = None
 

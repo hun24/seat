@@ -97,14 +97,14 @@
             </div>
 
             <div class="config-group">
-                <label>📋 명렬표 (직책 설정 및 특별석 우선체크)</label>
+                <label>📋 명렬표</label>
                 <div id="roster" class="roster-container">
                     <div style="color:#999; text-align:center; padding-top:20px;">명단을 불러오세요</div>
                 </div>
             </div>
             
             <div class="config-group">
-                <label>🤝 짝 지정 (같은 모둠 내 배정 우선)</label>
+                <label>🤝 짝 지정</label>
                 <div class="pair-container">
                     <select id="pair1"><option value="">학생1 선택</option></select>
                     <select id="pair2"><option value="">학생2 선택</option></select>
@@ -121,10 +121,10 @@
                 </div>
                 <label>모둠 배치 알고리즘 선택</label>
                 <select id="layout-type">
-                    <option value="normal">일반 격자 (여백 없음)</option>
-                    <option value="pair">2인 1조 기준 배정 (2줄마다 여백)</option>
-                    <option value="group4">4인 모둠 기준 (2x2 블록)</option>
-                    <option value="group6">6인 모둠 기준 (3x2 블록)</option>
+                    <option value="normal">일반 격자</option>
+                    <option value="pair">2명씩 짝 기준</option>
+                    <option value="group4">4인 모둠 기준 (2x2)</option>
+                    <option value="group6">6인 모둠 기준 (3x2)</option>
                 </select>
                 <button id="create-grid-btn" style="background: #2c3e50; margin-top: 5px;">교실 틀 생성</button>
             </div>
@@ -143,12 +143,12 @@
                 <label class="checkbox-label" style="margin-bottom: 5px; background: #f8fbff; padding: 6px; border-radius: 4px; border: 1px solid #e3f2fd;">
                     <input type="checkbox" id="toggle-role" checked> 🏷️ 조장(⭐)/부조장(🔷) 번호 옆 표시
                 </label>
-                <button id="arrange-btn" class="btn-success" style="margin-bottom: 5px;">랜덤 배치 시작 (지정석 제외)</button>
+                <button id="arrange-btn" class="btn-success" style="margin-bottom: 5px;">랜덤 배치 시작</button>
                 
                 <label style="font-size: 12px; font-weight: normal; margin-top: 4px;">📄 PDF 문서 상단 제목</label>
                 <input type="text" id="pdf-title-input" value="학급 자리 배치도" style="margin-bottom: 5px; font-size: 13px;">
                 
-                <button id="pdf-btn" class="btn-info" style="margin-bottom: 5px;">A4 가로 PDF 다운로드 (교사용 180도 회전)</button>
+                <button id="pdf-btn" class="btn-info" style="margin-bottom: 5px;">A4 가로 PDF 다운로드</button>
                 
                 <div class="file-btn-container">
                     <button id="save-json-btn" class="btn-purple">💾 배치 파일로 저장</button>
@@ -811,7 +811,7 @@
                 url = URL.createObjectURL(blob)
                 link = js_document.createElement("a")
                 link.href = url
-                link.download = "자리배치도_A4.pdf"
+                link.download = "자리배치도.pdf"
                 link.click()
                 URL.revokeObjectURL(url)
             except Exception as e:
